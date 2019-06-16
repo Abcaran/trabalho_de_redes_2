@@ -6,45 +6,66 @@
 #include <math.h>
 #include <string.h>
 
+/* If tern?rio para x pot?ncia de 2 */
+// int eh_potencia = (isPowerOfTwo(int x)) ? 1 : 0;
+
 /*
  * Retorna o tamanho (em bits) de um pacote codificado com base no
  * tamanho do pacote original (em bytes).
  */
-int getCodedLength(int packetLength) {
-	return (packetLength * 8);
+int getCodedLength(int packetLength, int dataSize) {
+	
+    /*
+     * Argumentos:
+     *  - packetLength: argumento de entrada, inteiro. Tamanho do pacote
+     * original, em bytes.
+     *  - dataSize: argumento de entrada, inteiro. Tamanho da quantidade de bits de dado por pacote
+     * Valor de retorno: tamanho do pacote codificado em bits.
+     */
+     int numBits = packetLength * 8;	//numeroTotalDeBits
+     int incrRange = 2;			
+     int paritySize=2, parityRange = 1;     
+     
+     while(dataSize > parityRange){
+        paritySize++;				//numero de bits paridade
+        parityRange += (incrRange * 2) - 1;	//
+        incrRange = incrRange * 2; 
+     }
+     
+     return ((numBits/dataSize) * (dataSize + paritySize));	
+/*tamanho necessário para o vetor codificado*/
 }
 
 /* Realiza o cálculo de Hamming */
+
 int calculo_hamming(int posicao, int codigo_length, unsigned char * codedPacket)
-{
-	int contador = 0,i,j;
-	i = posicao-1;
-	while(i < codigo_length)
 	{
-		for(j = i; j < i + posicao; j++)
+		int contador = 0,i,j;
+		i = posicao-1;
+		while(i < codigo_length)
 		{
-			if(codedPacket[j] == 1)
+			for(j = i; j < i + posicao; j++)
 			{
-				contador++;
+				if(codedPacket[j] == 1)
+					contador++;
 			}
+			i = i + 2 * posicao;
 		}
-		i = i + 2 * posicao;
+		if(contador%2 == 0)
+			return 0;
+		else
+			return 1;
 	}
-	if(contador%2 == 0)
-		return 0;
-	else
-		return 1;
-}
 	
 /* 
 	Codifica o pacote de entrada, gerando um pacote
     de saida com bits redundantes. 
 */
-void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int packetLength) 
-{
-	int i = 0, j, k, n_paridades = 0, codigo_c_paridade_length;
+void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int packetLength) {
+
+	int i = 0, j, k, n_paridades = 0, codigo_length, codigo_c_paridade_length = 0;
 			
-	/* Determina o tamanho final do código com as paridades */
+	/* Determina o tamanho final do c?digo com as paridades */
 	while(packetLength > (int)pow(2,i)-(i+1))
 	{
 		n_paridades++;
@@ -55,7 +76,7 @@ void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int
 	
 	j=k=0;
 	
-	/* Adiciona os bits com as paridades nos locais corretos no código de saída */
+	/* Adiciona os bits com as paridades nos locais corretos no c?digo de sa?da */
 	for(i = 0; i < codigo_c_paridade_length; i++)
 	{
 		if(i == ((int)pow(2,k) - 1))
@@ -81,10 +102,10 @@ void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int
 /* Executa decodificacao do pacote transmittedPacket, gerando
     novo pacote decodedPacket. Nota: codedLength eh em bits. */
 void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPacket, int packetLength, int codedLength) {
-    int i = 0, n = 0, n_paridades = 0, codigo_c_paridade_length = 0;
+    int i = 0, n_paridades = 0, n, o, posicao, valor, codigo_c_paridade_length = 0;
     int posicao_erro = 0;
     
-	/* Determina o tamanho final do código com as paridades */
+	/* Determina o tamanho final do c?digo com as paridades */
 	while(packetLength > (int)pow(2,i)-(i+1))
 	{
 		n_paridades++;
@@ -96,16 +117,30 @@ void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPack
     /* Identificar se há erros no pacote transmitido */
     for(n = 0; n < n_paridades; n++)
 	{
-		int posicao = (int)pow(2,i);
-		int valor = calculo_hamming(posicao, codigo_c_paridade_length, transmittedPacket);
+		posicao = (int)pow(2,n);
+		valor = calculo_hamming(posicao, codigo_c_paridade_length, transmittedPacket);
 		if(valor != 0)
 		{
 			posicao_erro += posicao;				
 		}
 	}
 	if(posicao_erro == 1)
+	{		
+		printf("O código ta correto.\n");
+	} 
+	else{
+		if(transmittedPacket[posicao_erro] == 0)
+		{
+			transmittedPacket[posicao_erro] = 1;
+		}
+		else
+		{
+			transmittedPacket[posicao_erro]= 0;
+		}
+	}
+	for(o = 0; o < codigo_c_paridade_length; o++)
 	{
-		
+		decodedPacket[o] = transmittedPacket[o];		
 	}
 }
 
@@ -204,7 +239,7 @@ void help(char * self) {
 int main(int argc, char ** argv) {
 
     //Parametros de entrada.
-    int packetLength, reps;
+    int packetLength, reps, totalSize, dataSize;
     double errorProb;
 
     //Pacotes manipulados.
@@ -222,21 +257,23 @@ int main(int argc, char ** argv) {
     int codedLength;
 
     //Leitura dos argumentos de linha de comando.
-    if (argc != 4)
+    if (argc != 6)
         help(argv[0]);
 
     packetLength = atoi(argv[1]);
     reps = atoi(argv[2]);
     errorProb = atof(argv[3]);
+	totalSize = atoi(argv[4]);
+	dataSize = atoi(argv[5]);
 
-    if (packetLength <= 0 || reps <= 0 || errorProb < 0 || errorProb > 1)
+    if (packetLength <= 0 || reps <= 0  || totalSize <= 0 || dataSize <= 0 || errorProb < 0 || errorProb > 1)
         help(argv[0]);
 
     //Inicializacao da semente do gerador de numeros pseudo-aleatorios.
     srand(time(NULL));
 
     //Geracao do pacote original aleatorio.
-    codedLength = getCodedLength(packetLength);
+    codedLength = getCodedLength(packetLength, dataSize);
     originalPacket = malloc(packetLength * 8);
     decodedPacket = malloc(packetLength * 8);
     codedPacket = malloc(codedLength);
@@ -272,5 +309,5 @@ int main(int argc, char ** argv) {
     printf("Numero de pacotes corrompidos: %lu\n", totalPacketErrorCount);
     printf("Taxa de erro de pacotes: %.2f%%\n", (double) totalPacketErrorCount / (double) reps * 100.0);
 
-    return(0);
+    return 0;
 }
