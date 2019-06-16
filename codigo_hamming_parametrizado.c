@@ -6,9 +6,6 @@
 #include <math.h>
 #include <string.h>
 
-/* If ternário para x potência de 2 */
-// int eh_potencia = (isPowerOfTwo(int x)) ? 1 : 0;
-
 /*
  * Retorna o tamanho (em bits) de um pacote codificado com base no
  * tamanho do pacote original (em bytes).
