@@ -6,9 +6,6 @@
 #include <math.h>
 #include <string.h>
 
-/* If tern?rio para x pot?ncia de 2 */
-// int eh_potencia = (isPowerOfTwo(int x)) ? 1 : 0;
-
 /*
  * Retorna o tamanho (em bits) de um pacote codificado com base no
  * tamanho do pacote original (em bytes).
@@ -33,11 +30,10 @@ int getCodedLength(int packetLength, int dataSize) {
      }
      
      return ((numBits/dataSize) * (dataSize + paritySize));	
-/*tamanho necess�rio para o vetor codificado*/
+/*tamanho necessário para o vetor codificado*/
 }
 
-/* Realiza o c�lculo de Hamming */
-
+/* Realiza o cálculo de Hamming */
 int calculo_hamming(int posicao, int codigo_length, unsigned char * codedPacket)
 	{
 		int contador = 0,i,j;
@@ -59,13 +55,13 @@ int calculo_hamming(int posicao, int codigo_length, unsigned char * codedPacket)
 	
 /* 
 	Codifica o pacote de entrada, gerando um pacote
-    de saida com bits redundantes. 
+    de saída com bits redundantes. 
 */
-void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int packetLength) {
+void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int packetLength, int totalSize, int dataSize) {
 
 	int i = 0, j, k, n_paridades = 0, codigo_length, codigo_c_paridade_length = 0;
 			
-	/* Determina o tamanho final do c?digo com as paridades */
+	/* Determina o tamanho final do código com as paridades */
 	while(packetLength > (int)pow(2,i)-(i+1))
 	{
 		n_paridades++;
@@ -76,7 +72,7 @@ void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int
 	
 	j=k=0;
 	
-	/* Adiciona os bits com as paridades nos locais corretos no c?digo de sa?da */
+	/* Adiciona os bits de paridades (inicializados com 0) nos locais corretos no código de saída */
 	for(i = 0; i < codigo_c_paridade_length; i++)
 	{
 		if(i == ((int)pow(2,k) - 1))
@@ -91,6 +87,7 @@ void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int
 		}
 	}
 	
+	/* Calcula as paridades utilizando a função calculo_hamming */
 	for(i = 0; i < n_paridades; i++)
 	{
 		int posicao = (int)pow(2,i);
@@ -101,11 +98,11 @@ void codePacket(unsigned char * codedPacket, unsigned char * originalPacket, int
 	
 /* Executa decodificacao do pacote transmittedPacket, gerando
     novo pacote decodedPacket. Nota: codedLength eh em bits. */
-void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPacket, int packetLength, int codedLength) {
+void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPacket, int packetLength, int codedLength, int totalSize, int dataSize) {
     int i = 0, n_paridades = 0, n, o, posicao, valor, codigo_c_paridade_length = 0;
     int posicao_erro = 0;
     
-	/* Determina o tamanho final do c?digo com as paridades */
+	/* Determina o tamanho final do código com as paridades */
 	while(packetLength > (int)pow(2,i)-(i+1))
 	{
 		n_paridades++;
@@ -114,7 +111,7 @@ void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPack
 	
 	codigo_c_paridade_length = n_paridades + packetLength;
     
-    /* Identificar se h� erros no pacote transmitido */
+    /* Identificar se há erros no pacote transmitido */
     for(n = 0; n < n_paridades; n++)
 	{
 		posicao = (int)pow(2,n);
@@ -126,7 +123,7 @@ void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPack
 	}
 	if(posicao_erro == 1)
 	{		
-		printf("O c�digo ta correto.\n");
+		printf("O código ta correto.\n");
 	} 
 	else{
 		if(transmittedPacket[posicao_erro] == 0)
@@ -138,6 +135,7 @@ void decodePacket(unsigned char * decodedPacket, unsigned char * transmittedPack
 			transmittedPacket[posicao_erro]= 0;
 		}
 	}
+	/* Preenche o decodedPacket a partir da correção de erros feita no transmittedPacket */
 	for(o = 0; o < codigo_c_paridade_length; o++)
 	{
 		decodedPacket[o] = transmittedPacket[o];		
@@ -280,7 +278,7 @@ int main(int argc, char ** argv) {
     transmittedPacket = malloc(codedLength);
 
     generateRandomPacket(originalPacket, packetLength);
-    codePacket(codedPacket, originalPacket, packetLength);
+    codePacket(codedPacket, originalPacket, packetLength, totalSize, dataSize);
 
     //Loop de repeticoes da simulacao.
     for (i = 0; i < reps; i++) {
@@ -289,7 +287,7 @@ int main(int argc, char ** argv) {
         totalInsertedErrorCount += insertErrors(transmittedPacket, codedPacket, codedLength, errorProb);
 
         //Gerar versao decodificada do pacote.
-        decodePacket(decodedPacket, transmittedPacket, packetLength, codedLength);
+        decodePacket(decodedPacket, transmittedPacket, packetLength, codedLength, totalSize, dataSize);
 
         //Contar erros.
         bitErrorCount = countErrors(originalPacket, decodedPacket, packetLength);
